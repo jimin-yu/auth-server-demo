@@ -7,8 +7,8 @@ Doorkeeper.configure do
 
   # This block will be called to check whether the resource owner is authenticated or not.
   resource_owner_from_credentials do |routes|
-    user = User.find_for_authentication(email: email)
-    user&.valid_password?(password) ? user : nil
+    user = User.find_for_authentication(email: params[:email])
+    user&.valid_password?(params[:password]) ? user : nil
   end
 
   # If you didn't skip applications controller from Doorkeeper routes in your application routes.rb
@@ -494,7 +494,7 @@ Doorkeeper::JWT.configure do
   # about the user. Defaults to a randomly generated token in a hash:
   #     { token: "RANDOM-TOKEN" }
   token_payload do |opts|
-    user = User.find(opts[:resource_owner_id])
+    user = User.find_by(id: opts[:resource_owner_id])
 
     {
       iss: 'my auth server',
