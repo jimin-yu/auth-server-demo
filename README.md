@@ -16,8 +16,7 @@ Authorization(허가, 인가) : 사원증/방문증을 제시하고 회사 리�
 -> resource owner authentication(인증) 후 access-token 발급을 담당하는 서버  
 `resource server` : dealibird  
 -> access-token을 지참한 request에 대해 protected 리소스 응답 혹은 거절을 하는 서버  
-`client`  
--> protected 리소스에 대한 요청을 보내는 쪽. app   
+`client` : dealibird  
 `resource owner` : end-user
 
 ### grant_type
@@ -38,8 +37,75 @@ access token 발급 flow. Oauth2에는 여러가지 grant type이 있다. 예를
 
 쿠버네티스 환경의 OAuth
 -------------------
+![architecture](public/architecture1.jpeg)
 
+### envoy jwt authentication 동작 방식
+[Envoy JWT auth](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/jwt_authn_filter.html?highlight=location)  
+- default로 설정되어 있는 토큰 추출 location은 request header의 `Authorization: Bearer <token>` 이다.
+- jwt signature verify에 jwks 사용.   
+  hash 알고리즘이라면 secret key, rsa 방식이라면 public key를 jwks에서 retrieve해서 토큰 무결성 검증.
 
+### istio authentication policy 설정
+[Istio Authorization Concepts](https://istio.io/latest/docs/concepts/security/#authorization)  
+Istio Authorization architecture
+> **Each Envoy proxy runs an authorization engine that authorizes requests at runtime.** When a request comes to the proxy, the authorization engine evaluates the request context against the current authorization policies, and returns the authorization result, either ALLOW or DENY. Operators specify Istio authorization policies using .yaml files.
+
+yaml 파일로 policy (rule) 명세. `RequestAuthentication`, `AuthorizationPolicy` 두가지가 필요하다.
+
+[RequestAuthentication](https://istio.io/latest/docs/reference/config/security/request_authentication/)  
+[AuthorizationPolicy](https://istio.io/latest/docs/reference/config/security/authorization-policy/)  
+예)
+```yaml
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata:
+  name: httpbin
+  namespace: foo
+spec:
+  selector:
+    matchLabels:
+      app: httpbin
+  jwtRules:
+  - issuer: "issuer-foo"
+    jwksUri: https://example.com/.well-known/jwks.json
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: httpbin
+  namespace: foo
+spec:
+  selector:
+    matchLabels:
+      app: httpbin
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        requestPrincipals: ["issuer-foo/*"]
+    to:
+    - operation:
+        hosts: ["example.com"]
+  - from:
+    - source:
+        requestPrincipals: ["issuer-bar/*"]
+    to:
+    - operation:
+        hosts: ["another-host.com"]
+
+```
+1) RequestAuthentication  
+   `jwtRules` 
+   - `issuer` : 토큰 발행자, 
+   - `jwks` or `jwksUri` : 여기 있는 secret key나 public key로 토큰 signature 확인해서 무결성 검증
+2) AuthorizationPolicy  
+   `action` : CUSTOM, DENY, ALLOW  
+   `rules` : requst 매칭 조건. 
+   - `from` (어디서 온 request인지), 
+   - `to` (어디가 destination인 request인지), 
+   - `when` (key=value 인지. 예를들면 토큰 issuer 확인 등)
+
+- istio는 이렇게 설정한 config를 타겟 endpoint들로 전송해서 각 envoy proxy에서 authentication 진행..?
 
 Rails Authorization Server
 --------------------------
@@ -96,9 +162,9 @@ rails db:seed
 access 토큰 발급  
 `POST /oauth/token`
 
-**end-user를 위한 access-token 발행**  
+**end-user를 위한 access-token 발행**    
 params
-```
+```json
 {
     "grant_type": "password",
     "email": "jjmmyyou111@deali.net",
@@ -108,7 +174,7 @@ params
 }
 ```
 output
-```
+```json
 {
     "access_token": {access-token},
     "token_type": "Bearer",
@@ -119,9 +185,9 @@ output
 ```
 `config/initializers/doorkeeper.rb ` 파일에 정의한 `resource_owner_from_credentials` 로직으로 유저를 검증한 뒤 access-token을 발급해줍니다.
 
-**end-user 토큰 재발급**
+**end-user 토큰 재발급**  
 params
-```
+```json
 {
     "grant_type": "refresh_token",
     "refresh_token": "op79jDaDOLr3s-VDM7srcm7pvfAYrqSxkXL3EnW6A08",
@@ -130,7 +196,7 @@ params
 }
 ```
 output
-```
+```json
 {
     "access_token": {access-token},
     "token_type": "Bearer",
@@ -141,9 +207,9 @@ output
 ```
 지난 access-token 발급시 함께 줬던 refresh-token을 첨부하여 access-token을 재발급 받습니다.
 
-**외부 서비스를 위한 access-token 발행**
+**외부 서비스를 위한 access-token 발행**  
 params
-```
+```json
 {
     "grant_type": "client_credentials",
     "client_id": "FGMYl6VvgIMO3zQJBRD5NotBavFpp3AEMOWRXDWe9Ic",
@@ -151,7 +217,7 @@ params
 }
 ```
 output
-```
+```json
 {
     "access_token": {access-token},
     "token_type": "Bearer",
@@ -166,7 +232,7 @@ output
 access 토큰 무효화  
 `POST /oauth/revoke`
 params
-```
+```json
 {
     "token": {access-token},
     "client_id": "FGMYl6VvgIMO3zQJBRD5NotBavFpp3AEMOWRXDWe9Ic",
@@ -174,7 +240,7 @@ params
 }
 ```
 output
-```
+```json
 {}
 ```
 #### redirect_url `urn:ietf:wg:oauth:2.0:oob` 
