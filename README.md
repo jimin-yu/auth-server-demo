@@ -37,6 +37,7 @@ access token 발급 flow. Oauth2에는 여러가지 grant type이 있다. 예를
 
 쿠버네티스 환경의 OAuth
 -------------------
+![archiecture2](public/architecture2.jpeg)
 ![architecture](public/architecture1.jpeg)
 
 ### envoy jwt authentication 동작 방식
