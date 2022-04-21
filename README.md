@@ -34,7 +34,7 @@ access token 발급 flow. Oauth2에는 여러가지 grant type이 있다. 예를
 ![implicit grant](public/implicit.png)
 ![password flow](public/resource_owner_password_credentials.png)
 ![client credentials](public/client_credentials.png)
-
+![resource owner password credentials](public/resource_owner_password_credentials.png)
 
 쿠버네티스 환경의 OAuth
 -------------------
