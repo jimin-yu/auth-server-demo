@@ -106,6 +106,21 @@ spec:
    - `when` (key=value 인지. 예를들면 토큰 issuer 확인 등)
 
 - istio는 이렇게 설정한 config를 타겟 endpoint들로 전송해서 각 envoy proxy에서 authentication 진행..?
+- 이때 jwks의 k (jwt_secret_key) value는 `application.rb` 파일에 적은 secret_key랑 같은 값으로 하면 될 것 같다(base64 인코딩 된)..   
+  이게 토큰 encode 할 때 사용한 값이니까, decode 할 때도 이걸로 하겠지?
+  heimdall doorkeeper.rb 파일 secret_key config랑 kubectl describe로 jwks k 값 찾아서 base64 디코딩한 거 두 개 일치 하는 거 보면 맞는듯
+
+
+### 클러스터에 배포된 auth policy 확인하기
+```
+kubectl get authorizationpolicy -n ssm-dev
+
+kubectl describe authorizationpolicy/dealibird-matrix-ap -n ssm-dev
+
+kubectl get requestauthentication -n ssm-dev
+
+kubectl describe requestauthentication/dealibird-matrix-pa -n ssm-dev
+```
 
 Rails Authorization Server
 --------------------------
